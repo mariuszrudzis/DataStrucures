@@ -27,6 +27,7 @@ public class LinkedList<E> implements MyCollection<E> {
 
 		@Override
 		public E next() {
+			//TODO: ConcurrentModificationException
 			if (this.currentNode == null) {
 				throw new RuntimeException("No such element");
 			}
@@ -38,7 +39,7 @@ public class LinkedList<E> implements MyCollection<E> {
 
 	private Node<E> head;
 	private Node<E> tail;
-	private long size;
+	private int size;
 
 	/*---------------------------------------------------------------------------*/
 	/*---------------------------------------------------------------------------*/
@@ -84,6 +85,8 @@ public class LinkedList<E> implements MyCollection<E> {
 				this.head.prev = null;
 			}
 			this.size--;
+		} else {
+			throw new RuntimeException("List is empty.");
 		}
 		return result;
 	}
@@ -99,24 +102,26 @@ public class LinkedList<E> implements MyCollection<E> {
 				this.tail.next = null;
 			}
 			this.size--;
+		} else {
+			throw new RuntimeException("List is empty.");
 		}
 		return result;
 	}
 
-	public E get(long index) {
+	public E get(int index) {
 		if(index < 0 || index > this.size - 1) {
 			throw new RuntimeException("Index out of bounds.");
 		}
 		
 		Node<E> temporary = null;
-		if(index <= this.size / 2) {
+		if(index <= (this.size - 1)/ 2) {
 			temporary = this.head;
-			for(int i = 0; i < index; i++) {
+			for(int i = 0; i != index; i++) {
 				temporary = temporary.next;
 			}
 		} else {
 			temporary = this.tail;
-			for(int i = 0; i < index; i++) {
+			for(int i = (this.size - 1); i != index; i--) {
 				temporary = temporary.prev;
 			}
 		}
@@ -133,20 +138,26 @@ public class LinkedList<E> implements MyCollection<E> {
 
 	@Override
 	public boolean contains(E item) {
-		// TODO Auto-generated method stub
-		return false;
+		boolean result = false;
+		for(E e : this) {
+			if(e.equals(item)) {
+				result = true;
+				break;
+			}
+		}
+		return result;
 	}
 
 	@Override
-	public long size() {
-		// TODO Auto-generated method stub
-		return 0;
+	public int size() {
+		return this.size;
 	}
 
 	@Override
 	public void clear() {
-		// TODO Auto-generated method stub
-
+		this.head = null;
+		this.tail = null;
+		this.size = 0;
 	}
 
 	/*---------------------------------------------------------------------------*/

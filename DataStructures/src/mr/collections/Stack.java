@@ -30,7 +30,7 @@ public class Stack<E> implements MyCollection<E> {
 	}
 
 	@Override
-	public long size() {
+	public int size() {
 		return this.list.size();
 	}
 

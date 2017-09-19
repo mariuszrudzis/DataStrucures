@@ -40,7 +40,7 @@ public class BinarySearchTree<E extends Comparable<? super E>> implements MyColl
 	}
 
 	@Override
-	public long size() {
+	public int size() {
 		// TODO Auto-generated method stub
 		return 0;
 	}
