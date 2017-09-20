@@ -3,12 +3,14 @@ package mr.collections;
 import java.util.Iterator;
 
 public class LinkedList<E> implements MyCollection<E> {
-	
+
 	public LinkedList() {
 		this.iterators = new LinkedList<>(true);
 	}
-	private LinkedList(boolean test) {}
-	
+
+	private LinkedList(boolean test) {
+	}
+
 	/*---------------------------------------------------------------------------*/
 	/*---------------------------------------------------------------------------*/
 
@@ -19,12 +21,9 @@ public class LinkedList<E> implements MyCollection<E> {
 	}
 
 	private class LinkedListIterator implements Iterator<E> {
-		
+
 		private Node<E> currentNode = LinkedList.this.head;
 		private boolean modified = false;
-		public LinkedListIterator() {
-			LinkedList.this.attachIterator(this);
-		}
 
 		@Override
 		public boolean hasNext() {
@@ -33,21 +32,20 @@ public class LinkedList<E> implements MyCollection<E> {
 
 		@Override
 		public E next() {
-			if(this.modified) {
+			if (this.modified) {
 				throw new RuntimeException("Concurrent modification exception.");
 			}
-			
-			if(this.currentNode == null) {
+
+			if (this.currentNode == null) {
 				throw new RuntimeException("No such element.");
 			}
-			
+
 			Node<E> result = this.currentNode;
 			this.currentNode = this.currentNode.next;
 			return result.item;
 		}
 
 		private void notifyIterator() {
-			LinkedList.this.detachIterator(this);
 			this.modified = true;
 		}
 	}
@@ -56,6 +54,7 @@ public class LinkedList<E> implements MyCollection<E> {
 	private Node<E> tail;
 	private int size;
 	private LinkedList<LinkedListIterator> iterators;
+
 	/*---------------------------------------------------------------------------*/
 	/*---------------------------------------------------------------------------*/
 	public void addFront(E item) {
@@ -75,25 +74,26 @@ public class LinkedList<E> implements MyCollection<E> {
 	}
 
 	public void add(int index, E item) {
-		if(this.size == 0 && index == 0) {
+		this.notifyAllIterators();
+		if (this.size == 0 && index == 0) {
 			this.head = new Node<E>();
 			this.tail = this.head;
 			this.head.item = item;
-		} else if(this.size != 0 && this.size - index > 0) {
+		} else if (this.size != 0 && this.size - index > 0) {
 			Node<E> temporary = this.getNode(index);
 			Node<E> prev = temporary.prev;
 			Node<E> newNode = new Node<E>();
-			
+
 			newNode.item = item;
 			newNode.next = temporary;
 			temporary.prev = newNode;
-			if(prev == null) {
+			if (prev == null) {
 				this.head = newNode;
 			} else {
 				newNode.prev = prev;
 				prev.next = newNode;
 			}
-		} else if(this.size != 0 && this.size - index == 0) {
+		} else if (this.size != 0 && this.size - index == 0) {
 			this.tail.next = new Node<E>();
 			this.tail.next.prev = this.tail;
 			this.tail = this.tail.next;
@@ -105,18 +105,19 @@ public class LinkedList<E> implements MyCollection<E> {
 	}
 
 	public E remove(int index) {
+		this.notifyAllIterators();
 		Node<E> temporary = this.getNode(index);
 		Node<E> prev = temporary.prev;
 		Node<E> next = temporary.next;
 		E result = temporary.item;
-		
-		if(prev == null && next == null) {
+
+		if (prev == null && next == null) {
 			this.head = null;
 			this.tail = null;
-		} else if(prev == null && next != null) {
+		} else if (prev == null && next != null) {
 			next.prev = null;
 			this.head = next;
-		} else if(prev != null && next != null) {
+		} else if (prev != null && next != null) {
 			prev.next = next;
 			next.prev = prev;
 		} else {
@@ -136,7 +137,8 @@ public class LinkedList<E> implements MyCollection<E> {
 
 	@Override
 	public Iterator<E> iterator() {
-		return new LinkedListIterator();
+		this.iterators.addBack(new LinkedListIterator());
+		return this.iterators.get(this.iterators.size() - 1);
 	}
 
 	@Override
@@ -155,9 +157,14 @@ public class LinkedList<E> implements MyCollection<E> {
 	public int size() {
 		return this.size;
 	}
+	
+	public void testSize() {
+		System.out.println(this.iterators.size());
+	}
 
 	@Override
 	public void clear() {
+		this.notifyAllIterators();
 		this.head = null;
 		this.tail = null;
 		this.size = 0;
@@ -186,26 +193,16 @@ public class LinkedList<E> implements MyCollection<E> {
 		}
 		return temporary;
 	}
-	
+
 	/*---------------------------------------------------------------------------*/
 	/*---------------------------------------------------------------------------*/
-	
+
 	private void notifyAllIterators() {
-		for(int i = 0; i < this.iterators.size(); i++) {
-			this.iterators.get(i).notifyIterator();
-		}
-	}
-	
-	private void attachIterator(LinkedListIterator iterator) {
-		this.iterators.addBack(iterator);
-	}
-	
-	private void detachIterator(LinkedListIterator iterator) {
-		for(int i = 0; i < this.iterators.size(); i++) {
-			if(this.iterators.get(i).equals(iterator)) {
-				this.iterators.remove(i);
-				break;
+		if (this.iterators != null) {
+			for (int i = 0; i < this.iterators.size(); i++) {
+				this.iterators.get(i).notifyIterator();
 			}
+			this.iterators.clear();
 		}
 	}
 }

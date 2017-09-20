@@ -2,6 +2,8 @@ package mr.collections;
 
 import static org.junit.Assert.*;
 
+import java.util.Iterator;
+
 import org.junit.Before;
 import org.junit.Test;
 
@@ -127,6 +129,14 @@ public class LinkedListTest {
 		this.fillListFront();
 		this.list.clear();
 		this.list.removeBack();
+	}
+	
+	@Test(expected = RuntimeException.class)
+	public void shouldAddThreeElementsFrontAndThrowBecauseOfRemove() {
+		this.fillListFront();
+		for(String s : this.list) {
+			this.list.remove(0);
+		}
 	}
 
 }
