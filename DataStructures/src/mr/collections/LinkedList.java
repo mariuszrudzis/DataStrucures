@@ -3,7 +3,12 @@ package mr.collections;
 import java.util.Iterator;
 
 public class LinkedList<E> implements MyCollection<E> {
-
+	
+	public LinkedList() {
+		this.iterators = new LinkedList<>(true);
+	}
+	private LinkedList(boolean test) {}
+	
 	/*---------------------------------------------------------------------------*/
 	/*---------------------------------------------------------------------------*/
 
@@ -13,119 +18,117 @@ public class LinkedList<E> implements MyCollection<E> {
 		public Node<E> next;
 	}
 
-	private static class LinkedListIterator<E> implements Iterator<E> {
-		private Node<E> currentNode;
-
-		public LinkedListIterator(Node<E> head) {
-			this.currentNode = head;
+	private class LinkedListIterator implements Iterator<E> {
+		
+		private Node<E> currentNode = LinkedList.this.head;
+		private boolean modified = false;
+		public LinkedListIterator() {
+			LinkedList.this.attachIterator(this);
 		}
 
 		@Override
 		public boolean hasNext() {
-			return this.currentNode != null ? true : false;
+			return this.currentNode != null;
 		}
 
 		@Override
 		public E next() {
-			//TODO: ConcurrentModificationException
-			if (this.currentNode == null) {
-				throw new RuntimeException("No such element");
+			if(this.modified) {
+				throw new RuntimeException("Concurrent modification exception.");
 			}
-			E result = this.currentNode.item;
+			
+			if(this.currentNode == null) {
+				throw new RuntimeException("No such element.");
+			}
+			
+			Node<E> result = this.currentNode;
 			this.currentNode = this.currentNode.next;
-			return result;
+			return result.item;
+		}
+
+		private void notifyIterator() {
+			LinkedList.this.detachIterator(this);
+			this.modified = true;
 		}
 	}
 
 	private Node<E> head;
 	private Node<E> tail;
 	private int size;
-
+	private LinkedList<LinkedListIterator> iterators;
 	/*---------------------------------------------------------------------------*/
 	/*---------------------------------------------------------------------------*/
-
 	public void addFront(E item) {
-		if (this.head != null) {
-			Node<E> temporary = new Node<>();
-			temporary.item = item;
-			temporary.next = this.head;
-			this.head.prev = temporary;
-			this.head = temporary;
-		} else {
-			this.head = new Node<>();
-			this.head.item = item;
-			this.tail = this.head;
-		}
-		this.size++;
+		this.add(0, item);
 	}
 
 	public void addBack(E item) {
-		if (this.tail != null) {
-			Node<E> temporary = new Node<>();
-			temporary.item = item;
-			temporary.prev = this.tail;
-			this.tail.next = temporary;
-			this.tail = temporary;
-		} else {
-			this.tail = new Node<>();
+		this.add(this.size, item);
+	}
+
+	public E removeFront() {
+		return this.remove(0);
+	}
+
+	public E removeBack() {
+		return this.remove(this.size - 1);
+	}
+
+	public void add(int index, E item) {
+		if(this.size == 0 && index == 0) {
+			this.head = new Node<E>();
+			this.tail = this.head;
+			this.head.item = item;
+		} else if(this.size != 0 && this.size - index > 0) {
+			Node<E> temporary = this.getNode(index);
+			Node<E> prev = temporary.prev;
+			Node<E> newNode = new Node<E>();
+			
+			newNode.item = item;
+			newNode.next = temporary;
+			temporary.prev = newNode;
+			if(prev == null) {
+				this.head = newNode;
+			} else {
+				newNode.prev = prev;
+				prev.next = newNode;
+			}
+		} else if(this.size != 0 && this.size - index == 0) {
+			this.tail.next = new Node<E>();
+			this.tail.next.prev = this.tail;
+			this.tail = this.tail.next;
 			this.tail.item = item;
-			this.head = this.tail;
+		} else {
+			throw new RuntimeException("Index out of bounds.");
 		}
 		this.size++;
 	}
 
-	public E removeFront() {
-		E result = null;
-		if (this.head != null) {
-			result = this.head.item;
-			this.head = this.head.next;
-			if (this.head == null) {
-				this.tail = null;
-			} else {
-				this.head.prev = null;
-			}
-			this.size--;
+	public E remove(int index) {
+		Node<E> temporary = this.getNode(index);
+		Node<E> prev = temporary.prev;
+		Node<E> next = temporary.next;
+		E result = temporary.item;
+		
+		if(prev == null && next == null) {
+			this.head = null;
+			this.tail = null;
+		} else if(prev == null && next != null) {
+			next.prev = null;
+			this.head = next;
+		} else if(prev != null && next != null) {
+			prev.next = next;
+			next.prev = prev;
 		} else {
-			throw new RuntimeException("List is empty.");
+			prev.next = null;
+			this.tail = prev;
 		}
-		return result;
-	}
-
-	public E removeBack() {
-		E result = null;
-		if (this.tail != null) {
-			result = this.tail.item;
-			this.tail = this.tail.prev;
-			if (this.tail == null) {
-				this.head = null;
-			} else {
-				this.tail.next = null;
-			}
-			this.size--;
-		} else {
-			throw new RuntimeException("List is empty.");
-		}
+		this.size--;
 		return result;
 	}
 
 	public E get(int index) {
-		if(index < 0 || index > this.size - 1) {
-			throw new RuntimeException("Index out of bounds.");
-		}
-		
-		Node<E> temporary = null;
-		if(index <= (this.size - 1)/ 2) {
-			temporary = this.head;
-			for(int i = 0; i != index; i++) {
-				temporary = temporary.next;
-			}
-		} else {
-			temporary = this.tail;
-			for(int i = (this.size - 1); i != index; i--) {
-				temporary = temporary.prev;
-			}
-		}
-		return temporary.item;
+		return this.getNode(index).item;
 	}
 
 	/*---------------------------------------------------------------------------*/
@@ -133,14 +136,14 @@ public class LinkedList<E> implements MyCollection<E> {
 
 	@Override
 	public Iterator<E> iterator() {
-		return new LinkedListIterator<>(this.head);
+		return new LinkedListIterator();
 	}
 
 	@Override
 	public boolean contains(E item) {
 		boolean result = false;
-		for(E e : this) {
-			if(e.equals(item)) {
+		for (E e : this) {
+			if (e.equals(item)) {
 				result = true;
 				break;
 			}
@@ -162,4 +165,47 @@ public class LinkedList<E> implements MyCollection<E> {
 
 	/*---------------------------------------------------------------------------*/
 	/*---------------------------------------------------------------------------*/
+
+	private Node<E> getNode(int index) {
+		if (index < 0 || index > this.size - 1) {
+			throw new RuntimeException("Index out of bounds.");
+		}
+
+		int middleIndex = this.size / 2;
+		Node<E> temporary = null;
+		if (index <= middleIndex) {
+			temporary = this.head;
+			for (int i = 0; i < index; i++) {
+				temporary = temporary.next;
+			}
+		} else {
+			temporary = this.tail;
+			for (int i = this.size - 1; i > index; i--) {
+				temporary = temporary.prev;
+			}
+		}
+		return temporary;
+	}
+	
+	/*---------------------------------------------------------------------------*/
+	/*---------------------------------------------------------------------------*/
+	
+	private void notifyAllIterators() {
+		for(int i = 0; i < this.iterators.size(); i++) {
+			this.iterators.get(i).notifyIterator();
+		}
+	}
+	
+	private void attachIterator(LinkedListIterator iterator) {
+		this.iterators.addBack(iterator);
+	}
+	
+	private void detachIterator(LinkedListIterator iterator) {
+		for(int i = 0; i < this.iterators.size(); i++) {
+			if(this.iterators.get(i).equals(iterator)) {
+				this.iterators.remove(i);
+				break;
+			}
+		}
+	}
 }
