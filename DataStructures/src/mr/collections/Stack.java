@@ -3,7 +3,7 @@ package mr.collections;
 import java.util.Iterator;
 
 public class Stack<E> implements MyCollection<E> {
-	private LinkedList<E> list;
+	private LinkedList<E> list = new LinkedList<>();
 	
 	/*---------------------------------------------------------------------------*/
 	/*---------------------------------------------------------------------------*/
