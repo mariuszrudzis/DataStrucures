@@ -1,51 +1,45 @@
 package mr.collections;
 
+import java.util.ConcurrentModificationException;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 
-public class LinkedList<E> implements MyCollection<E> {
+public class LinkedList<E> implements MCollection<E> {
 
-	public LinkedList() {
-		this.iterators = new LinkedList<>(true);
-	}
-
-	private LinkedList(boolean test) {
-	}
-
-	/*---------------------------------------------------------------------------*/
-	/*---------------------------------------------------------------------------*/
-
-	private static class Node<E> {
+	protected static class Node<E> {
 		public E item;
-		public Node<E> prev;
 		public Node<E> next;
+		public Node<E> prev;
+
+		public Node(E item) {
+			this.item = item;
+		}
 	}
 
-	private class LinkedListIterator implements Iterator<E> {
-
-		private Node<E> currentNode = LinkedList.this.head;
+	protected class LinkedListIterator implements Iterator<E> {
+		Node<E> currentNode = LinkedList.this.head;
 		private boolean modified = false;
 
 		@Override
 		public boolean hasNext() {
-			return this.currentNode != null;
+			return this.currentNode != null & !this.modified;
 		}
 
 		@Override
 		public E next() {
 			if (this.modified) {
-				throw new RuntimeException("Concurrent modification exception.");
+				throw new ConcurrentModificationException();
 			}
 
-			if (this.currentNode == null) {
-				throw new RuntimeException("No such element.");
+			if (!this.hasNext()) {
+				throw new NoSuchElementException();
 			}
-
 			Node<E> result = this.currentNode;
-			this.currentNode = this.currentNode.next;
+			currentNode = currentNode.next;
 			return result.item;
 		}
 
-		private void notifyIterator() {
+		private void detach() {
 			this.modified = true;
 		}
 	}
@@ -55,132 +49,118 @@ public class LinkedList<E> implements MyCollection<E> {
 	private int size;
 	private LinkedList<LinkedListIterator> iterators;
 
-	/*---------------------------------------------------------------------------*/
-	/*---------------------------------------------------------------------------*/
-	public void addFront(E item) {
-		this.add(0, item);
+	public LinkedList() {
+		this.iterators = new LinkedList<>(true);
 	}
 
-	public void addBack(E item) {
-		this.add(this.size, item);
-	}
-
-	public E removeFront() {
-		return this.remove(0);
-	}
-
-	public E removeBack() {
-		return this.remove(this.size - 1);
+	private LinkedList(boolean t) {
 	}
 
 	public void add(int index, E item) {
-		this.notifyAllIterators();
-		if (this.size == 0 && index == 0) {
-			this.head = new Node<E>();
-			this.tail = this.head;
-			this.head.item = item;
-		} else if (this.size != 0 && this.size - index > 0) {
-			Node<E> temporary = this.getNode(index);
-			Node<E> prev = temporary.prev;
-			Node<E> newNode = new Node<E>();
+		if (item == null) {
+			throw new IllegalArgumentException();
+		}
 
-			newNode.item = item;
-			newNode.next = temporary;
-			temporary.prev = newNode;
-			if (prev == null) {
-				this.head = newNode;
-			} else {
-				newNode.prev = prev;
-				prev.next = newNode;
-			}
-		} else if (this.size != 0 && this.size - index == 0) {
-			this.tail.next = new Node<E>();
+		if (this.size == 0 && index == 0) {
+			this.head = new Node<E>(item);
+			this.tail = this.head;
+		} else if (this.size != 0 && index == 0) {
+			this.head.prev = new Node<E>(item);
+			this.head.prev.next = this.head;
+			this.head = this.head.prev;
+		} else if (this.size != 0 && index == this.size) {
+			this.tail.next = new Node<E>(item);
 			this.tail.next.prev = this.tail;
 			this.tail = this.tail.next;
-			this.tail.item = item;
+		} else if (this.size != 0 && (index > 0 || index < this.size)) {
+			Node<E> next = this.getNode(index);
+			Node<E> prev = next.prev;
+			Node<E> temporary = new Node<E>(item);
+			temporary.prev = prev;
+			prev.next = temporary;
+			temporary.next = next;
+			next.prev = temporary;
+
 		} else {
-			throw new RuntimeException("Index out of bounds.");
+			throw new IndexOutOfBoundsException();
 		}
+		this.detachIterators();
 		this.size++;
 	}
 
 	public E remove(int index) {
-		this.notifyAllIterators();
-		Node<E> temporary = this.getNode(index);
-		Node<E> prev = temporary.prev;
-		Node<E> next = temporary.next;
-		E result = temporary.item;
-
-		if (prev == null && next == null) {
+		Node<E> result = null;
+		if (this.size == 1 && index == 0) {
+			result = this.head;
 			this.head = null;
 			this.tail = null;
-		} else if (prev == null && next != null) {
-			next.prev = null;
-			this.head = next;
-		} else if (prev != null && next != null) {
-			prev.next = next;
-			next.prev = prev;
+		} else if (this.size > 0 && index == 0) {
+			result = this.head;
+			this.head = this.head.next;
+			result.next = null;
+		} else if (this.size > 0 && (index > 0 || index < this.size - 1)) {
+			Node<E> temporary = this.getNode(index);
+			temporary.prev.next = temporary.next;
+			temporary.next.prev = temporary.prev;
+			temporary.prev = null;
+			temporary.next = null;
+		} else if (this.size > 0 && index == this.size - 1) {
+			result = this.tail;
+			this.tail = this.tail.prev;
+			result.prev = null;
 		} else {
-			prev.next = null;
-			this.tail = prev;
+			throw new IndexOutOfBoundsException();
 		}
 		this.size--;
-		return result;
+		this.detachIterators();
+		return result.item;
 	}
 
 	public E get(int index) {
+		if (index < 0 || index > size - 1) {
+			throw new IndexOutOfBoundsException();
+		}
 		return this.getNode(index).item;
 	}
 
-	/*---------------------------------------------------------------------------*/
-	/*---------------------------------------------------------------------------*/
-
 	@Override
 	public Iterator<E> iterator() {
-		this.iterators.addBack(new LinkedListIterator());
-		return this.iterators.get(this.iterators.size() - 1);
-	}
-
-	@Override
-	public boolean contains(E item) {
-		boolean result = false;
-		for (E e : this) {
-			if (e.equals(item)) {
-				result = true;
-				break;
-			}
-		}
-		return result;
+		this.iterators.add(0, new LinkedListIterator());
+		return this.iterators.get(0);
 	}
 
 	@Override
 	public int size() {
 		return this.size;
 	}
-	
-	public void testSize() {
-		System.out.println(this.iterators.size());
+
+	@Override
+	public boolean isEmpty() {
+		return this.size == 0;
 	}
 
 	@Override
 	public void clear() {
-		this.notifyAllIterators();
 		this.head = null;
 		this.tail = null;
 		this.size = 0;
+		this.detachIterators();
 	}
 
-	/*---------------------------------------------------------------------------*/
-	/*---------------------------------------------------------------------------*/
+	@Override
+	public boolean containsValue(E element) {
+		for (E e : this) {
+			if (e.equals(element)) {
+				return true;
+			}
+		}
+		return false;
+	}
 
 	private Node<E> getNode(int index) {
-		if (index < 0 || index > this.size - 1) {
-			throw new RuntimeException("Index out of bounds.");
-		}
-
-		int middleIndex = this.size / 2;
+		int middle = this.size / 2;
 		Node<E> temporary = null;
-		if (index <= middleIndex) {
+		if (index <= middle) {
 			temporary = this.head;
 			for (int i = 0; i < index; i++) {
 				temporary = temporary.next;
@@ -194,15 +174,12 @@ public class LinkedList<E> implements MyCollection<E> {
 		return temporary;
 	}
 
-	/*---------------------------------------------------------------------------*/
-	/*---------------------------------------------------------------------------*/
-
-	private void notifyAllIterators() {
+	private void detachIterators() {
 		if (this.iterators != null) {
-			for (int i = 0; i < this.iterators.size(); i++) {
-				this.iterators.get(i).notifyIterator();
+			int size = this.iterators.size;
+			for (int i = 0; i < size; i++) {
+				this.iterators.remove(0).detach();
 			}
-			this.iterators.clear();
 		}
 	}
 }
