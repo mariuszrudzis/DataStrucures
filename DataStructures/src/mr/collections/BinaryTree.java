@@ -1,8 +1,9 @@
 package mr.collections;
 
+import java.util.ConcurrentModificationException;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 import java.util.Optional;
-
 
 public abstract class BinaryTree<K extends Comparable<? super K>, E> implements MCollection<E> {
 
@@ -18,10 +19,37 @@ public abstract class BinaryTree<K extends Comparable<? super K>, E> implements 
 			this.item = item;
 		}
 	}
-
-	protected class PreorderTraversalIterator implements Iterator<E> {
+	
+	protected class PreorderTraversalIteratorWrapper implements Iterator<E> {
+		private PreorderTraversalIterator it = new PreorderTraversalIterator();
 		private boolean modified = false;
+		@Override
+		public boolean hasNext() {
+			return it.hasNext();
+		}
+
+		@Override
+		public E next() {
+			if(this.modified) {
+				throw new ConcurrentModificationException();
+			}
+			
+			if(!this.hasNext()) {
+				throw new NoSuchElementException();
+			}
+			
+			return it.next().item;
+		}
+		
+		private void detach() {
+			this.modified = true;
+		}
+		
+	}
+	
+	protected class PreorderTraversalIterator implements Iterator<Node<K, E>> {
 		private Node<K, E> currentNode = BinaryTree.this.root;
+		private Stack<Node<K, E>> nodes = new Stack<>();
 
 		@Override
 		public boolean hasNext() {
@@ -29,31 +57,33 @@ public abstract class BinaryTree<K extends Comparable<? super K>, E> implements 
 		}
 
 		@Override
-		public E next() {
-			if (this.modified) {
-				throw new RuntimeException("Concurrent modification.");
+		public Node<K, E> next() {
+			Node<K, E> result = this.currentNode;
+			if (this.currentNode.right != null) {
+				this.nodes.push(this.currentNode.right);
 			}
 
-			if (!this.hasNext()) {
-				throw new RuntimeException("No such element.");
+			if (this.currentNode.left != null) {
+				this.currentNode = this.currentNode.left;
+			} else {
+				if (!this.nodes.isEmpty()) {
+					this.currentNode = this.nodes.pop();
+				} else {
+					this.currentNode = null;
+				}
 			}
-
-			return null;
+			return result;
 		}
-		
-		private void detach() {
-			this.modified = true;
-		}
-
 	}
 
 	protected int size;
 	protected Node<K, E> root;
-	protected LinkedList<PreorderTraversalIterator> iterators = new LinkedList<>();
+	protected LinkedList<PreorderTraversalIteratorWrapper> iterators = new LinkedList<>();
 
 	@Override
 	public Iterator<E> iterator() {
-		return new PreorderTraversalIterator();
+		this.iterators.add(0, new PreorderTraversalIteratorWrapper());
+		return this.iterators.get(0);
 	}
 
 	@Override
@@ -88,7 +118,11 @@ public abstract class BinaryTree<K extends Comparable<? super K>, E> implements 
 
 	public E search(K key) {
 		if (key == null) {
-			throw new RuntimeException("Illegal argument.");
+			throw new IllegalArgumentException();
+		}
+		
+		if (this.root == null) {
+			throw new IllegalStateException();
 		}
 
 		return this.nodeSearch(key).map(e -> e.item).orElse(null);
@@ -102,7 +136,7 @@ public abstract class BinaryTree<K extends Comparable<? super K>, E> implements 
 
 	protected void notifyIterators() {
 		int size = this.iterators.size();
-		for(int i = 0; i < size; i++) {
+		for (int i = 0; i < size; i++) {
 			this.iterators.remove(0).detach();
 		}
 	}

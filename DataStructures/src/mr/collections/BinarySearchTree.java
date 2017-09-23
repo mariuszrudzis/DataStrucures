@@ -1,41 +1,37 @@
 package mr.collections;
 
-import java.util.Optional;
+import java.util.NoSuchElementException;
 
-public class bstImpl<K extends Comparable<? super K>, E> {
+public class BinarySearchTree<K extends Comparable<? super K>, E> extends BinaryTree<K, E> {
 
-	private static class Node<K, E> {
-		public K key;
-		public E item;
-		public Node<K, E> parent;
-		public Node<K, E> left;
-		public Node<K, E> right;
-
-		public Node(K key, E item) {
-			this.key = key;
-			this.item = item;
-		}
-	}
-	
-	private Node<K, E> root;
-	private int size;
-
+	@Override
 	public void insert(K key, E item) {
-		if(key == null || item == null) {
-			throw new RuntimeException("Illegal argument.");
+		if (key == null || item == null) {
+			throw new IllegalArgumentException();
 		}
+		
+		this.notifyIterators();
+		
+		if(this.root == null) {
+			this.root = new Node<K, E>(key, item);
+			this.size++;
+			return;
+		}
+		
 		Node<K, E> temporary = this.root;
-		while(true) {
-			if(key.compareTo(temporary.key) < 0) {
-				if(temporary.left == null) {
+		while (true) {
+			if (key.compareTo(temporary.key) < 0) {
+				if (temporary.left == null) {
 					temporary.left = new Node<K, E>(key, item);
+					temporary.left.parent = temporary;
 					this.size++;
 					return;
-				} 
+				}
 				temporary = temporary.left;
-			} else if(key.compareTo(temporary.key) > 0) {
-				if(temporary.right == null) {
+			} else if (key.compareTo(temporary.key) > 0) {
+				if (temporary.right == null) {
 					temporary.right = new Node<K, E>(key, item);
+					temporary.right.parent = temporary;
 					this.size++;
 					return;
 				}
@@ -47,15 +43,23 @@ public class bstImpl<K extends Comparable<? super K>, E> {
 		}
 	}
 
+	@Override
 	public E remove(K key) {
-		if(key == null) {
-			throw new RuntimeException("Illegal argument.");
+		if (key == null) {
+			throw new IllegalArgumentException();
 		}
+		
+		if (this.root == null) {
+			throw new IllegalStateException();
+		}
+		
+		this.notifyIterators();
 		
 		Node<K, E> removed = this.nodeSearch(key).orElse(null);
 		if (removed == null) {
-			return null;
+			throw new NoSuchElementException();
 		}
+		
 		E result = removed.item;
 
 		if (removed.left == null && removed.right == null) {
@@ -102,7 +106,7 @@ public class bstImpl<K extends Comparable<? super K>, E> {
 			}
 
 			removed.item = min.item;
-
+			removed.key = min.key;
 			if (min.right == null) {
 				if (min.parent.left == min) {
 					min.parent.left = null;
@@ -125,36 +129,18 @@ public class bstImpl<K extends Comparable<? super K>, E> {
 		return result;
 	}
 
-	public E search(K key) {
-		if(key == null) {
-			throw new RuntimeException("Illegal argument.");
+	@Override
+	public void addAll(BinaryTree<K, ? extends E> tree) {
+		if(tree == null) {
+			throw new IllegalArgumentException();
 		}
 		
-		return this.nodeSearch(key).map(e -> e.item).orElse(null);
-	}
-
-	/*---------------------------------------------------------------------------*/
-	/*---------------------------------------------------------------------------*/
-
-	private Optional<Node<K, E>> nodeSearch(K key) {
-		Node<K, E> temporary = this.root;
-		while (true) {
-			if (key.compareTo(temporary.key) < 0) {
-				if (temporary.left != null) {
-					temporary = temporary.left;
-				} else {
-					return Optional.ofNullable(null);
-				}
-			} else if (key.compareTo(temporary.key) > 0) {
-				if (temporary.right != null) {
-					temporary = temporary.right;
-				} else {
-					return Optional.ofNullable(null);
-				}
-			} else {
-				return Optional.of(temporary);
-			}
+		this.notifyIterators();
+		
+		BinaryTree<K, ? extends E>.PreorderTraversalIterator it = tree.new PreorderTraversalIterator();
+		while (it.hasNext()) {
+			Node<K, ? extends E> node = it.next();
+			this.insert(node.key, node.item);
 		}
 	}
-
 }
